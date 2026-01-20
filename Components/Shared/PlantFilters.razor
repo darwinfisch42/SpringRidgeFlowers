@@ -1,0 +1,114 @@
+@using SpringRidgeFlowers.Models
+
+<MudPaper Class="pa-4" Elevation="0" Outlined="true">
+    <MudText Typo="Typo.h6" GutterBottom="true">Filters</MudText>
+
+    <MudDivider Class="mb-3" />
+
+    <MudSwitch @bind-Value="_isFloridaNative"
+               Color="Color.Primary" Label="Florida Native Only" T="bool" Class="mb-3" />
+
+    <MudSwitch @bind-Value="_isEdible"
+               Color="Color.Primary" Label="Edible Only" T="bool" Class="mb-3" />
+
+    <MudSwitch @bind-Value="Filter.InStockOnly"
+               Color="Color.Primary" Label="In Stock Only" T="bool" Class="mb-3" />
+
+    <MudDivider Class="my-3" />
+
+    <MudSelect @bind-Value="Filter.LifeCycle"
+               Label="Life Cycle" Clearable="true" Variant="Variant.Outlined" Class="mb-3" T="string">
+        @foreach (var lc in LifeCycles)
+        {
+            <MudSelectItem Value="@lc">@lc</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect @bind-Value="Filter.SunExposure"
+               Label="Sun Exposure" Clearable="true" Variant="Variant.Outlined" Class="mb-3" T="string">
+        @foreach (var se in SunExposures)
+        {
+            <MudSelectItem Value="@se">@se</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect @bind-Value="Filter.WaterNeeds"
+               Label="Water Needs" Clearable="true" Variant="Variant.Outlined" Class="mb-3" T="string">
+        @foreach (var wn in WaterNeeds)
+        {
+            <MudSelectItem Value="@wn">@wn</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudDivider Class="my-3" />
+
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Price Range</MudText>
+    <MudStack Row="true" Spacing="2">
+        <MudNumericField @bind-Value="Filter.MinPrice" Label="Min" Format="C2"
+                         Variant="Variant.Outlined" Min="0m"
+                         Clearable="true" T="decimal?" />
+        <MudNumericField @bind-Value="Filter.MaxPrice" Label="Max" Format="C2"
+                         Variant="Variant.Outlined" Min="0m"
+                         Clearable="true" T="decimal?" />
+    </MudStack>
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+               Class="mt-4" OnClick="ApplyFilters">
+        Apply Filters
+    </MudButton>
+
+    <MudButton Variant="Variant.Text" Color="Color.Secondary" FullWidth="true"
+               Class="mt-2" OnClick="ClearFilters">
+        Clear All
+    </MudButton>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired]
+    public PlantFilterModel Filter { get; set; } = null!;
+
+    [Parameter]
+    public List<string> LifeCycles { get; set; } = new();
+
+    [Parameter]
+    public List<string> SunExposures { get; set; } = new();
+
+    [Parameter]
+    public List<string> WaterNeeds { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnFilterChanged { get; set; }
+
+    // Local state only needed for nullable bool -> bool conversion
+    private bool _isFloridaNative;
+    private bool _isEdible;
+
+    protected override void OnInitialized()
+    {
+        _isFloridaNative = Filter.IsFloridaNative ?? false;
+        _isEdible = Filter.IsEdible ?? false;
+    }
+
+    private async Task ApplyFilters()
+    {
+        Filter.IsFloridaNative = _isFloridaNative ? true : null;
+        Filter.IsEdible = _isEdible ? true : null;
+        await OnFilterChanged.InvokeAsync();
+    }
+
+    private async Task ClearFilters()
+    {
+        _isFloridaNative = false;
+        _isEdible = false;
+        Filter.SearchTerm = null;
+        Filter.IsFloridaNative = null;
+        Filter.IsEdible = null;
+        Filter.LifeCycle = null;
+        Filter.SunExposure = null;
+        Filter.WaterNeeds = null;
+        Filter.MinPrice = null;
+        Filter.MaxPrice = null;
+        Filter.InStockOnly = false;
+        await OnFilterChanged.InvokeAsync();
+    }
+}

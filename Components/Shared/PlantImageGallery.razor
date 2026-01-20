@@ -1,0 +1,51 @@
+<MudCarousel @bind-SelectedIndex="_selectedIndex" Style="height:400px;"
+             ShowArrows="@(ImageUrls.Count > 1)"
+             ShowBullets="@(ImageUrls.Count > 1)"
+             AutoCycle="false" TData="object">
+    @if (ImageUrls.Any())
+    {
+        @foreach (var imageUrl in ImageUrls)
+        {
+            <MudCarouselItem Transition="Transition.Slide">
+                <div class="d-flex justify-center align-center" style="height:100%">
+                    <MudImage Src="@imageUrl" Alt="@AltText" ObjectFit="ObjectFit.Contain"
+                              Height="380" Fluid="true" />
+                </div>
+            </MudCarouselItem>
+        }
+    }
+    else
+    {
+        <MudCarouselItem>
+            <div class="d-flex justify-center align-center" style="height:100%">
+                <MudImage Src="/images/plants/placeholder.jpg" Alt="No image available"
+                          ObjectFit="ObjectFit.Contain" Height="380" />
+            </div>
+        </MudCarouselItem>
+    }
+</MudCarousel>
+
+@if (ImageUrls.Count > 1)
+{
+    <MudStack Row="true" Justify="Justify.Center" Class="mt-2" Spacing="2">
+        @for (var i = 0; i < ImageUrls.Count; i++)
+        {
+            var index = i;
+            <MudImage Src="@ImageUrls[i]" Alt="@($"Thumbnail {i + 1}")"
+                      Width="60" Height="60" ObjectFit="ObjectFit.Cover"
+                      Class="@(index == _selectedIndex ? "mud-border-primary" : "")"
+                      Style="@(index == _selectedIndex ? "border: 2px solid; cursor: pointer;" : "cursor: pointer; opacity: 0.7;")"
+                      @onclick="@(() => _selectedIndex = index)" />
+        }
+    </MudStack>
+}
+
+@code {
+    [Parameter]
+    public List<string> ImageUrls { get; set; } = new();
+
+    [Parameter]
+    public string? AltText { get; set; }
+
+    private int _selectedIndex = 0;
+}

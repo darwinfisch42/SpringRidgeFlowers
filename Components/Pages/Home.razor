@@ -1,0 +1,50 @@
+﻿@page "/"
+@using SpringRidgeFlowers.Services.Interfaces
+@inject IPlantService PlantService
+
+<PageTitle>Spring Ridge Flowers - Florida Native Plants</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Welcome to Spring Ridge Flowers</MudText>
+<MudText Typo="Typo.subtitle1" Class="mb-4">
+    Discover beautiful Florida native plants and flowers for your garden
+</MudText>
+
+<MudDivider Class="my-4" />
+
+<MudText Typo="Typo.h5" GutterBottom="true">Featured Plants</MudText>
+
+@if (_loading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_featuredPlants.Any())
+{
+    <MudGrid>
+        @foreach (var plant in _featuredPlants)
+        {
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <PlantCard Plant="plant" />
+            </MudItem>
+        }
+    </MudGrid>
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/catalog"
+               Class="mt-4" EndIcon="@Icons.Material.Filled.ArrowForward">
+        View All Plants
+    </MudButton>
+}
+else
+{
+    <MudAlert Severity="Severity.Info">No plants available yet. Check back soon!</MudAlert>
+}
+
+@code {
+    private List<PlantDto> _featuredPlants = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _featuredPlants = await PlantService.GetFeaturedPlantsAsync(6);
+        _loading = false;
+    }
+}

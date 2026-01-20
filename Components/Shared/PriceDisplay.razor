@@ -1,0 +1,11 @@
+<MudText Typo="Typo.h5" Color="Color.Success" Class="@Class">
+    @Price.ToString("C2")
+</MudText>
+
+@code {
+    [Parameter, EditorRequired]
+    public decimal Price { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+}

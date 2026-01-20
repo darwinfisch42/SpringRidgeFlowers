@@ -1,0 +1,125 @@
+@page "/catalog"
+@using SpringRidgeFlowers.Services.Interfaces
+@inject IPlantService PlantService
+
+<PageTitle>Plant Catalog - Spring Ridge Flowers</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Plant Catalog</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="3">
+        <PlantFilters Filter="_filter"
+                      LifeCycles="_lifeCycles"
+                      SunExposures="_sunExposures"
+                      WaterNeeds="_waterNeeds"
+                      OnFilterChanged="ApplyFilters" />
+    </MudItem>
+
+    <MudItem xs="12" md="9">
+        <MudPaper Class="pa-3 mb-4" Elevation="0" Outlined="true">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_filter.SearchTerm"
+                                  Placeholder="Search plants..."
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true"
+                                  DebounceInterval="300"
+                                  OnDebounceIntervalElapsed="ApplyFilters" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect Value="_filter.SortBy" ValueChanged="OnSortChanged"
+                               Label="Sort By" Variant="Variant.Outlined" T="string">
+                        <MudSelectItem Value="@("name_asc")">Name (A-Z)</MudSelectItem>
+                        <MudSelectItem Value="@("name_desc")">Name (Z-A)</MudSelectItem>
+                        <MudSelectItem Value="@("price_asc")">Price (Low to High)</MudSelectItem>
+                        <MudSelectItem Value="@("price_desc")">Price (High to Low)</MudSelectItem>
+                        <MudSelectItem Value="@("newest")">Newest</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (_result.TotalCount > 0)
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">
+                Showing @((_filter.Page - 1) * _filter.PageSize + 1)-@Math.Min(_filter.Page * _filter.PageSize, _result.TotalCount) of @_result.TotalCount plants
+            </MudText>
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (_result.Items.Any())
+        {
+            <MudGrid>
+                @foreach (var plant in _result.Items)
+                {
+                    <MudItem xs="12" sm="6" lg="4">
+                        <PlantCard Plant="plant" />
+                    </MudItem>
+                }
+            </MudGrid>
+
+            @if (_result.TotalPages > 1)
+            {
+                <div class="d-flex justify-center mt-4">
+                    <MudPagination Color="Color.Primary"
+                                   Count="_result.TotalPages"
+                                   Selected="_filter.Page"
+                                   SelectedChanged="OnPageChanged" />
+                </div>
+            }
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No plants match your filters. Try adjusting your search criteria.
+            </MudAlert>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private PlantFilterModel _filter = new();
+    private PaginatedResult<PlantDto> _result = new();
+    private List<string> _lifeCycles = new();
+    private List<string> _sunExposures = new();
+    private List<string> _waterNeeds = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Execute sequentially - PostgreSQL doesn't support multiple concurrent commands on one connection
+        _lifeCycles = await PlantService.GetDistinctLifeCyclesAsync();
+        _sunExposures = await PlantService.GetDistinctSunExposuresAsync();
+        _waterNeeds = await PlantService.GetDistinctWaterNeedsAsync();
+        _result = await PlantService.GetPlantsAsync(_filter);
+        _loading = false;
+    }
+
+    private async Task ApplyFilters()
+    {
+        _filter.Page = 1;
+        _loading = true;
+        StateHasChanged();
+        _result = await PlantService.GetPlantsAsync(_filter);
+        _loading = false;
+    }
+
+    private async Task OnSortChanged(string sortBy)
+    {
+        _filter.SortBy = sortBy;
+        await ApplyFilters();
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _filter.Page = page;
+        _loading = true;
+        StateHasChanged();
+        _result = await PlantService.GetPlantsAsync(_filter);
+        _loading = false;
+    }
+}
