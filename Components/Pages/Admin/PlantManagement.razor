@@ -1,0 +1,481 @@
+@page "/admin/plants"
+@using Microsoft.AspNetCore.Authorization
+@using SpringRidgeFlowers.Models
+@using SpringRidgeFlowers.Services.Interfaces
+@attribute [Authorize]
+@inject IPlantService PlantService
+@inject ISnackbar Snackbar
+@inject IWebHostEnvironment Environment
+
+<PageTitle>Plant Management - Spring Ridge Flowers</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Plant Management</MudText>
+
+<MudGrid>
+    <!-- Left side: Plant List -->
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudText Typo="Typo.h6">Plants</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="CreateNewPlant">
+                    Add Plant
+                </MudButton>
+            </MudStack>
+
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_plants.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">No plants found. Add your first plant!</MudAlert>
+            }
+            else
+            {
+                <MudList T="PlantDto" Dense="true" Class="plant-list">
+                    @foreach (var plant in _plants)
+                    {
+                        <MudListItem T="PlantDto"
+                                     OnClick="() => SelectPlant(plant)"
+                                     Class="@(IsSelected(plant) ? "mud-primary-text" : "")">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.body1">@plant.CommonName</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @(plant.InStock ? $"{plant.QuantityAvailable} in stock" : "Out of stock")
+                                    </MudText>
+                                </MudStack>
+                                @if (!plant.InStock)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" />
+                                }
+                            </MudStack>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <!-- Right side: Plant Detail/Edit Form -->
+    <MudItem xs="12" md="8">
+        <MudPaper Elevation="2" Class="pa-4">
+            @if (_selectedPlant == null && !_isCreating)
+            {
+                <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="min-height: 400px;">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalFlorist" Size="Size.Large" Color="Color.Primary" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary">Select a plant to edit</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Or click "Add Plant" to create a new one</MudText>
+                </MudStack>
+            }
+            else if (_editModel != null)
+            {
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudText Typo="Typo.h6">@(_isCreating ? "New Plant" : "Edit Plant")</MudText>
+                    @if (!_isCreating)
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="DeletePlant">
+                            Delete
+                        </MudButton>
+                    }
+                </MudStack>
+
+                <EditForm Model="_editModel" OnValidSubmit="SavePlant">
+                    <DataAnnotationsValidator />
+
+                    <MudGrid>
+                        <!-- Basic Info -->
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle1" Class="mb-2">Basic Information</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_editModel.CommonName" Label="Common Name" Required="true"
+                                          For="@(() => _editModel.CommonName)" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_editModel.LatinName" Label="Latin Name"
+                                          For="@(() => _editModel.LatinName)" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_editModel.Description" Label="Description" Lines="3"
+                                          For="@(() => _editModel.Description)" />
+                        </MudItem>
+
+                        <!-- Price & Inventory -->
+                        <MudItem xs="12">
+                            <MudDivider Class="my-2" />
+                            <MudText Typo="Typo.subtitle1" Class="mb-2 mt-2">Price & Inventory</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField @bind-Value="_editModel.Price" Label="Price" Format="C2"
+                                             Min="0.01m" For="@(() => _editModel.Price)" Adornment="Adornment.Start" AdornmentText="$" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField @bind-Value="_editModel.QuantityAvailable" Label="Quantity Available"
+                                             Min="0" For="@(() => _editModel.QuantityAvailable)" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudSwitch @bind-Value="_editModel.IsActive" Label="Active" Color="Color.Primary" />
+                        </MudItem>
+
+                        <!-- Plant Characteristics -->
+                        <MudItem xs="12">
+                            <MudDivider Class="my-2" />
+                            <MudText Typo="Typo.subtitle1" Class="mb-2 mt-2">Plant Characteristics</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect @bind-Value="_editModel.LifeCycle" Label="Life Cycle" Clearable="true">
+                                <MudSelectItem Value="@("Annual")">Annual</MudSelectItem>
+                                <MudSelectItem Value="@("Perennial")">Perennial</MudSelectItem>
+                                <MudSelectItem Value="@("Biennial")">Biennial</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_editModel.Size" Label="Size" Placeholder="e.g., 12-24 inches"
+                                          For="@(() => _editModel.Size)" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect @bind-Value="_editModel.SunExposure" Label="Sun Exposure" Clearable="true">
+                                <MudSelectItem Value="@("Full Sun")">Full Sun</MudSelectItem>
+                                <MudSelectItem Value="@("Part Sun")">Part Sun</MudSelectItem>
+                                <MudSelectItem Value="@("Part Shade")">Part Shade</MudSelectItem>
+                                <MudSelectItem Value="@("Full Shade")">Full Shade</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect @bind-Value="_editModel.WaterNeeds" Label="Water Needs" Clearable="true">
+                                <MudSelectItem Value="@("Low")">Low</MudSelectItem>
+                                <MudSelectItem Value="@("Medium")">Medium</MudSelectItem>
+                                <MudSelectItem Value="@("High")">High</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect @bind-Value="_editModel.SoilMoisture" Label="Soil Moisture" Clearable="true">
+                                <MudSelectItem Value="@("Dry")">Dry</MudSelectItem>
+                                <MudSelectItem Value="@("Dry to Medium")">Dry to Medium</MudSelectItem>
+                                <MudSelectItem Value="@("Medium")">Medium</MudSelectItem>
+                                <MudSelectItem Value="@("Medium to Wet")">Medium to Wet</MudSelectItem>
+                                <MudSelectItem Value="@("Wet")">Wet</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_editModel.ColdTolerance" Label="Cold Tolerance" Placeholder="e.g., Zone 8-11"
+                                          For="@(() => _editModel.ColdTolerance)" />
+                        </MudItem>
+
+                        <!-- Flags -->
+                        <MudItem xs="12">
+                            <MudDivider Class="my-2" />
+                            <MudText Typo="Typo.subtitle1" Class="mb-2 mt-2">Tags</MudText>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudStack Row="true" Spacing="4">
+                                <MudSwitch @bind-Value="_editModel.IsFloridaNative" Label="Florida Native" Color="Color.Success" />
+                                <MudSwitch @bind-Value="_editModel.Edible" Label="Edible" Color="Color.Warning" />
+                            </MudStack>
+                        </MudItem>
+
+                        <!-- Images -->
+                        @if (!_isCreating && _editModel.Id.HasValue)
+                        {
+                            <MudItem xs="12">
+                                <MudDivider Class="my-2" />
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2 mt-2">
+                                    <MudText Typo="Typo.subtitle1">Photos (@_plantImages.Count/5)</MudText>
+                                    @if (_plantImages.Count < 5)
+                                    {
+                                        <MudFileUpload T="IBrowserFile" Accept=".jpg,.jpeg,.png,.gif,.webp" OnFilesChanged="OnFileSelected" MaximumFileCount="1">
+                                            <ActivatorContent>
+                                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                                           StartIcon="@Icons.Material.Filled.CloudUpload" Disabled="_uploading">
+                                                    @if (_uploading)
+                                                    {
+                                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                                    }
+                                                    Upload Photo
+                                                </MudButton>
+                                            </ActivatorContent>
+                                        </MudFileUpload>
+                                    }
+                                </MudStack>
+                            </MudItem>
+                            <MudItem xs="12">
+                                @if (_plantImages.Count == 0)
+                                {
+                                    <MudAlert Severity="Severity.Info" Dense="true">No photos yet. Upload up to 5 photos for this plant.</MudAlert>
+                                }
+                                else
+                                {
+                                    <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+                                        @foreach (var image in _plantImages)
+                                        {
+                                            <MudPaper Elevation="1" Class="pa-2" Style="position: relative; width: 120px;">
+                                                <MudImage Src="@image.ImageUrl" Alt="@(image.AltText ?? "Plant photo")"
+                                                          Width="100" Height="100" ObjectFit="ObjectFit.Cover" Class="rounded" />
+                                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-1">
+                                                    <MudTooltip Text="@(image.IsPrimary ? "Primary photo" : "Set as primary")">
+                                                        <MudIconButton Icon="@(image.IsPrimary ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+                                                                       Color="@(image.IsPrimary ? Color.Warning : Color.Default)"
+                                                                       Size="Size.Small"
+                                                                       OnClick="() => SetPrimaryImage(image)"
+                                                                       Disabled="image.IsPrimary" />
+                                                    </MudTooltip>
+                                                    <MudTooltip Text="Delete photo">
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                                       Color="Color.Error"
+                                                                       Size="Size.Small"
+                                                                       OnClick="() => DeleteImage(image)" />
+                                                    </MudTooltip>
+                                                </MudStack>
+                                            </MudPaper>
+                                        }
+                                    </MudStack>
+                                }
+                            </MudItem>
+                        }
+                        else if (_isCreating)
+                        {
+                            <MudItem xs="12">
+                                <MudDivider Class="my-2" />
+                                <MudText Typo="Typo.subtitle1" Class="mb-2 mt-2">Photos</MudText>
+                                <MudAlert Severity="Severity.Info" Dense="true">Save the plant first to upload photos.</MudAlert>
+                            </MudItem>
+                        }
+
+                        <!-- Actions -->
+                        <MudItem xs="12">
+                            <MudDivider Class="my-2" />
+                            <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2" Class="mt-4">
+                                <MudButton Variant="Variant.Text" OnClick="CancelEdit">Cancel</MudButton>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Submit"
+                                           Disabled="_saving">
+                                    @if (_saving)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    }
+                                    @(_isCreating ? "Create Plant" : "Save Changes")
+                                </MudButton>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </EditForm>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudMessageBox @ref="_deleteConfirmation" Title="Delete Plant?" CancelText="Cancel">
+    <MessageContent>
+        Are you sure you want to delete <strong>@_editModel?.CommonName</strong>? This action cannot be undone.
+    </MessageContent>
+    <YesButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error">Delete</MudButton>
+    </YesButton>
+</MudMessageBox>
+
+@code {
+    private List<PlantDto> _plants = new();
+    private PlantDto? _selectedPlant;
+    private PlantEditModel? _editModel;
+    private List<PlantImageEditModel> _plantImages = new();
+    private bool _loading = true;
+    private bool _saving;
+    private bool _uploading;
+    private bool _isCreating;
+    private MudMessageBox? _deleteConfirmation;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlants();
+    }
+
+    private async Task LoadPlants()
+    {
+        _loading = true;
+        _plants = await PlantService.GetAllPlantsForAdminAsync();
+        _loading = false;
+    }
+
+    private async Task SelectPlant(PlantDto plant)
+    {
+        _selectedPlant = plant;
+        _isCreating = false;
+        _editModel = await PlantService.GetPlantForEditAsync(plant.Id);
+        _plantImages = await PlantService.GetPlantImagesAsync(plant.Id);
+    }
+
+    private void CreateNewPlant()
+    {
+        _selectedPlant = null;
+        _isCreating = true;
+        _plantImages = new();
+        _editModel = new PlantEditModel
+        {
+            IsActive = true,
+            Price = 0.01m
+        };
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        if (_editModel?.Id == null) return;
+
+        var file = e.File;
+        if (file == null) return;
+
+        if (file.Size > 5 * 1024 * 1024)
+        {
+            Snackbar.Add("File too large. Maximum size is 5MB.", Severity.Error);
+            return;
+        }
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (!allowedExtensions.Contains(extension))
+        {
+            Snackbar.Add("Invalid file type. Allowed: jpg, jpeg, png, gif, webp", Severity.Error);
+            return;
+        }
+
+        _uploading = true;
+        StateHasChanged();
+
+        try
+        {
+            var uploadsFolder = Path.Combine(Environment.WebRootPath, "images", "plants");
+            Directory.CreateDirectory(uploadsFolder);
+
+            var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+            await using var stream = new FileStream(filePath, FileMode.Create);
+            await file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024).CopyToAsync(stream);
+
+            var imageUrl = $"/images/plants/{uniqueFileName}";
+            var altText = _editModel.CommonName;
+            await PlantService.AddPlantImageAsync(_editModel.Id.Value, imageUrl, altText);
+            _plantImages = await PlantService.GetPlantImagesAsync(_editModel.Id.Value);
+            Snackbar.Add("Photo uploaded successfully!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error uploading photo: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SetPrimaryImage(PlantImageEditModel image)
+    {
+        if (_editModel?.Id == null) return;
+
+        try
+        {
+            await PlantService.SetPrimaryImageAsync(_editModel.Id.Value, image.Id);
+            _plantImages = await PlantService.GetPlantImagesAsync(_editModel.Id.Value);
+            Snackbar.Add("Primary photo updated!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error setting primary photo: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteImage(PlantImageEditModel image)
+    {
+        if (_editModel?.Id == null) return;
+
+        try
+        {
+            await PlantService.DeletePlantImageAsync(image.Id);
+            _plantImages = await PlantService.GetPlantImagesAsync(_editModel.Id.Value);
+            Snackbar.Add("Photo deleted!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting photo: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SavePlant()
+    {
+        if (_editModel == null) return;
+
+        _saving = true;
+        try
+        {
+            if (_isCreating)
+            {
+                var newId = await PlantService.CreatePlantAsync(_editModel);
+                Snackbar.Add("Plant created successfully!", Severity.Success);
+            }
+            else
+            {
+                await PlantService.UpdatePlantAsync(_editModel);
+                Snackbar.Add("Plant updated successfully!", Severity.Success);
+            }
+
+            await LoadPlants();
+
+            if (_isCreating)
+            {
+                _isCreating = false;
+                _editModel = null;
+                _selectedPlant = null;
+                _plantImages = new();
+            }
+            else if (_selectedPlant != null)
+            {
+                var updated = _plants.FirstOrDefault(p => p.Id == _selectedPlant.Id);
+                if (updated != null)
+                {
+                    _selectedPlant = updated;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving plant: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeletePlant()
+    {
+        if (_editModel?.Id == null || _deleteConfirmation == null) return;
+
+        var result = await _deleteConfirmation.ShowAsync();
+        if (result == true)
+        {
+            try
+            {
+                await PlantService.DeletePlantAsync(_editModel.Id.Value);
+                Snackbar.Add("Plant deleted successfully!", Severity.Success);
+                await LoadPlants();
+                _selectedPlant = null;
+                _editModel = null;
+                _plantImages = new();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting plant: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private void CancelEdit()
+    {
+        _selectedPlant = null;
+        _editModel = null;
+        _plantImages = new();
+        _isCreating = false;
+    }
+
+    private bool IsSelected(PlantDto plant) => _selectedPlant?.Id == plant.Id;
+}

@@ -1,0 +1,46 @@
+@page "/admin/login"
+@inject NavigationManager Navigation
+
+<PageTitle>Admin Login - Spring Ridge Flowers</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5">Admin Login</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (_showError)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">Invalid password.</MudAlert>
+            }
+
+            <form method="post" action="/api/auth/login">
+                <MudTextField @bind-Value="_password"
+                              Label="Password"
+                              InputType="InputType.Password"
+                              Variant="Variant.Outlined"
+                              Class="mb-4"
+                              T="string"
+                              name="password" />
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true">
+                    Login
+                </MudButton>
+            </form>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private string _password = "";
+
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private bool _showError => Error == "1";
+}

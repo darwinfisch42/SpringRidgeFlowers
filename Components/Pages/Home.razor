@@ -42,6 +42,9 @@ else
     private List<PlantDto> _featuredPlants = new();
     private bool _loading = true;
 
+    //string password = BCrypt.Net.BCrypt.HashPassword("Br252zScPp84", 12);
+    //$2b$12$nUUu7M2w5qJ6.hrBza2DzuGwM9ypbA7v0l7ysbF3ZhAFYCQ04.JIy
+
     protected override async Task OnInitializedAsync()
     {
         _featuredPlants = await PlantService.GetFeaturedPlantsAsync(6);

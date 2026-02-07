@@ -139,6 +139,220 @@ public class PlantService : IPlantService
             .ToListAsync();
     }
 
+    public async Task<List<PlantDto>> GetAllPlantsForAdminAsync()
+    {
+        var plants = await _context.Plants
+            .Include(p => p.Images)
+            .Include(p => p.Stock)
+            .OrderBy(p => p.CommonName)
+            .ToListAsync();
+
+        return plants.Select(MapToDto).ToList();
+    }
+
+    public async Task<PlantEditModel?> GetPlantForEditAsync(Guid id)
+    {
+        var plant = await _context.Plants
+            .Include(p => p.Images)
+            .Include(p => p.Stock)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (plant == null) return null;
+
+        return new PlantEditModel
+        {
+            Id = plant.Id,
+            CommonName = plant.CommonName,
+            LatinName = plant.LatinName,
+            Description = plant.Description,
+            LifeCycle = plant.LifeCycle,
+            Size = plant.Size,
+            SoilMoisture = plant.SoilMoisture,
+            SunExposure = plant.SunExposure,
+            IsFloridaNative = plant.IsFloridaNative,
+            Price = plant.Price,
+            Edible = plant.Edible,
+            WaterNeeds = plant.WaterNeeds,
+            ColdTolerance = plant.ColdTolerance,
+            IsActive = plant.IsActive,
+            QuantityAvailable = plant.Stock?.QuantityAvailable ?? 0,
+            PrimaryImageUrl = plant.Images.FirstOrDefault(i => i.IsPrimary)?.ImageUrl
+                              ?? plant.Images.FirstOrDefault()?.ImageUrl
+        };
+    }
+
+    public async Task<Guid> CreatePlantAsync(PlantEditModel model)
+    {
+        var plant = new Plant
+        {
+            Id = Guid.NewGuid(),
+            CommonName = model.CommonName,
+            LatinName = model.LatinName,
+            Description = model.Description,
+            LifeCycle = model.LifeCycle,
+            Size = model.Size,
+            SoilMoisture = model.SoilMoisture,
+            SunExposure = model.SunExposure,
+            IsFloridaNative = model.IsFloridaNative,
+            Price = model.Price,
+            Edible = model.Edible,
+            WaterNeeds = model.WaterNeeds,
+            ColdTolerance = model.ColdTolerance,
+            IsActive = model.IsActive,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        plant.Stock = new Stock
+        {
+            Id = Guid.NewGuid(),
+            PlantId = plant.Id,
+            QuantityAvailable = model.QuantityAvailable
+        };
+
+        _context.Plants.Add(plant);
+        await _context.SaveChangesAsync();
+
+        return plant.Id;
+    }
+
+    public async Task UpdatePlantAsync(PlantEditModel model)
+    {
+        var plant = await _context.Plants
+            .Include(p => p.Stock)
+            .FirstOrDefaultAsync(p => p.Id == model.Id);
+
+        if (plant == null) return;
+
+        plant.CommonName = model.CommonName;
+        plant.LatinName = model.LatinName;
+        plant.Description = model.Description;
+        plant.LifeCycle = model.LifeCycle;
+        plant.Size = model.Size;
+        plant.SoilMoisture = model.SoilMoisture;
+        plant.SunExposure = model.SunExposure;
+        plant.IsFloridaNative = model.IsFloridaNative;
+        plant.Price = model.Price;
+        plant.Edible = model.Edible;
+        plant.WaterNeeds = model.WaterNeeds;
+        plant.ColdTolerance = model.ColdTolerance;
+        plant.IsActive = model.IsActive;
+        plant.UpdatedAt = DateTime.UtcNow;
+
+        if (plant.Stock != null)
+        {
+            plant.Stock.QuantityAvailable = model.QuantityAvailable;
+        }
+        else
+        {
+            plant.Stock = new Stock
+            {
+                Id = Guid.NewGuid(),
+                PlantId = plant.Id,
+                QuantityAvailable = model.QuantityAvailable
+            };
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeletePlantAsync(Guid id)
+    {
+        var plant = await _context.Plants.FindAsync(id);
+        if (plant != null)
+        {
+            _context.Plants.Remove(plant);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public async Task<List<PlantImageEditModel>> GetPlantImagesAsync(Guid plantId)
+    {
+        var images = await _context.PlantImages
+            .Where(i => i.PlantId == plantId)
+            .OrderBy(i => i.DisplayOrder)
+            .ToListAsync();
+
+        return images.Select(i => new PlantImageEditModel
+        {
+            Id = i.Id,
+            PlantId = i.PlantId,
+            ImageUrl = i.ImageUrl,
+            AltText = i.AltText,
+            DisplayOrder = i.DisplayOrder,
+            IsPrimary = i.IsPrimary
+        }).ToList();
+    }
+
+    public async Task<PlantImageEditModel> AddPlantImageAsync(Guid plantId, string imageUrl, string? altText)
+    {
+        var existingCount = await _context.PlantImages.CountAsync(i => i.PlantId == plantId);
+        var hasPrimary = await _context.PlantImages.AnyAsync(i => i.PlantId == plantId && i.IsPrimary);
+
+        var image = new PlantImage
+        {
+            Id = Guid.NewGuid(),
+            PlantId = plantId,
+            ImageUrl = imageUrl,
+            AltText = altText,
+            DisplayOrder = existingCount,
+            IsPrimary = !hasPrimary
+        };
+
+        _context.PlantImages.Add(image);
+        await _context.SaveChangesAsync();
+
+        return new PlantImageEditModel
+        {
+            Id = image.Id,
+            PlantId = image.PlantId,
+            ImageUrl = image.ImageUrl,
+            AltText = image.AltText,
+            DisplayOrder = image.DisplayOrder,
+            IsPrimary = image.IsPrimary
+        };
+    }
+
+    public async Task DeletePlantImageAsync(Guid imageId)
+    {
+        var image = await _context.PlantImages.FindAsync(imageId);
+        if (image != null)
+        {
+            var wasPrimary = image.IsPrimary;
+            var plantId = image.PlantId;
+
+            _context.PlantImages.Remove(image);
+            await _context.SaveChangesAsync();
+
+            if (wasPrimary)
+            {
+                var firstImage = await _context.PlantImages
+                    .Where(i => i.PlantId == plantId)
+                    .OrderBy(i => i.DisplayOrder)
+                    .FirstOrDefaultAsync();
+
+                if (firstImage != null)
+                {
+                    firstImage.IsPrimary = true;
+                    await _context.SaveChangesAsync();
+                }
+            }
+        }
+    }
+
+    public async Task SetPrimaryImageAsync(Guid plantId, Guid imageId)
+    {
+        var images = await _context.PlantImages
+            .Where(i => i.PlantId == plantId)
+            .ToListAsync();
+
+        foreach (var img in images)
+        {
+            img.IsPrimary = img.Id == imageId;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     private static PlantDto MapToDto(Plant plant)
     {
         return new PlantDto
